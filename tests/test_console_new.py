@@ -76,6 +76,9 @@ def test_new_package_scaffolds_full_skeleton(
         "tests/test_provider.py",
         ".github/workflows/ci.yml",
         ".github/workflows/release.yml",
+        ".github/workflows/security.yml",
+        ".github/dependabot.yml",
+        ".github/PULL_REQUEST_TEMPLATE.md",
         "Makefile",
         ".pre-commit-config.yaml",
     ):

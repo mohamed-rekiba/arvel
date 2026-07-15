@@ -1,19 +1,59 @@
 name: release
 
-# Tag vX.Y.Z -> build -> publish to PyPI via trusted publishing (no token secrets;
-# configure the publisher once at pypi.org -> project -> Publishing).
+# Push a version tag (vX.Y.Z) and this builds the wheel + sdist, checks the metadata,
+# cuts a GitHub Release, and publishes to PyPI. Auth is PyPI Trusted Publishing (OIDC) —
+# there's no API token to store. Set it up once at pypi.org -> your project -> Publishing
+# (this repo + this workflow + the `pypi` environment); until then the publish step
+# fails closed.
 on:
   push:
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+  workflow_dispatch:
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
-      id-token: write
+      contents: write # create the GitHub Release and attach the artifacts
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv build
+        with:
+          python-version: "3.14"
+      - name: Build the wheel and sdist
+        run: uv build --out-dir dist
+      - name: Check the distribution metadata
+        run: uvx twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Cut a GitHub Release with the artifacts
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* --title "$tag" --generate-notes
+          fi
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/arvel-{{name}}
+    permissions:
+      id-token: write # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          print-hash: true

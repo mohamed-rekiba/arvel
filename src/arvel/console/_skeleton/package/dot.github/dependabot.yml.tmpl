@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    # Wait a week before proposing a just-published version — a fresh release is the
+    # riskiest supply-chain window.
+    cooldown:
+      default-days: 7
+    labels: [dependencies]
+    groups:
+      dev-tooling:
+        patterns: ["ruff", "mypy", "pyright", "pytest*", "import-linter", "pre-commit"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    labels: [ci]

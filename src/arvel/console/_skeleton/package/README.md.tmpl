@@ -21,7 +21,9 @@ don't need. An un-pruned copy always boots and passes its own CI.
 | `src/{{mod}}/provider.py` | the integration point with the host app |
 | `src/{{mod}}/settings.py` | typed config view + defaults (host app values win) |
 | `tests/` | the booted-app fixture is how packages test without an app |
-| CI (`.github/workflows/ci.yml`) | ruff · mypy strict · import-linter · pytest |
+| CI (`.github/workflows/ci.yml`) | ruff · format · mypy strict · import-linter · pytest |
+| Security (`.github/workflows/security.yml`) | bandit · pip-audit · gitleaks, plus a weekly CVE sweep |
+| `.github/dependabot.yml` | keeps deps + actions current, with a 7-day cooldown |
 | `Makefile` + `.pre-commit-config.yaml` | `make check` / `make hooks` — the same gates locally |
 
 | Delete freely | When |
@@ -31,7 +33,7 @@ don't need. An un-pruned copy always boots and passes its own CI.
 | `routes.py` | package serves no HTTP |
 | `commands.py` | no CLI contribution |
 | `contracts.py` | no public Protocol to expose |
-| `.github/workflows/release.yml` | not publishing to PyPI |
+| `.github/workflows/release.yml` | not publishing to PyPI (tag `vX.Y.Z` → build → PyPI via Trusted Publishing) |
 
 ## Rules that keep a package healthy
 
