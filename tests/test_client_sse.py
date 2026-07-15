@@ -5,7 +5,14 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from arvel.client import Client, RequestFailed, ServerSentEvent
+from arvel.client import (
+    Client,
+    PendingRequest,
+    RequestFailed,
+    RequestTimedOut,
+    ServerSentEvent,
+    TransportFailed,
+)
 
 
 def _transport(handler: object) -> httpx.MockTransport:
@@ -66,3 +73,62 @@ async def test_stream_raises_request_failed_on_error_status() -> None:
         _ = [e async for e in client.stream("POST", "https://api.test/chat")]
     assert excinfo.value.response.status() == 429
     assert excinfo.value.response.body() == "nope"  # body is read before raising
+
+
+async def test_stream_via_per_call_client() -> None:
+    # a PendingRequest built directly (no shared client) exercises _open_stream's per-call branch
+    body = "data: one\n\ndata: [DONE]\n\n"
+    req = PendingRequest(transport=_transport(_stream_handler(body))).base_url("https://api.test")
+    seen = [event.data async for event in req.stream("GET", "/feed")]
+    assert seen == ["one", "[DONE]"]
+
+
+async def test_stream_maps_timeout_to_request_timed_out() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow")
+
+    client = Client(transport=_transport(handler))
+    with pytest.raises(RequestTimedOut):
+        _ = [e async for e in client.stream("POST", "https://api.test/chat")]
+
+
+async def test_stream_maps_transport_error_to_transport_failed() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    client = Client(transport=_transport(handler))
+    with pytest.raises(TransportFailed):
+        _ = [e async for e in client.stream("POST", "https://api.test/chat")]
+
+
+async def test_request_maps_timeout_to_request_timed_out() -> None:
+    # non-stream path: the timeout branch of request() maps to RequestTimedOut (not just ConnectError)
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow")
+
+    client = Client(transport=_transport(handler))
+    with pytest.raises(RequestTimedOut):
+        await client.get("https://api.test/x")
+
+
+async def test_stream_applies_auth() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["auth"] = request.headers.get("authorization", "")
+        return httpx.Response(200, text="data: x\n\n")
+
+    client = Client(transport=_transport(handler))
+    _ = [
+        e
+        async for e in client.with_basic_auth("ada", "s3cret").stream(
+            "GET", "https://api.test/feed"
+        )
+    ]
+    assert captured["auth"].startswith("Basic ")
+
+
+def test_server_sent_event_repr() -> None:
+    event = ServerSentEvent(data="hi", event="update")
+    assert "update" in repr(event)
+    assert "hi" in repr(event)
