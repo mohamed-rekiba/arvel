@@ -92,6 +92,10 @@ def test_new_package_scaffolds_full_skeleton(
         ".github/dependabot.yml",
         ".github/PULL_REQUEST_TEMPLATE.md",
         ".gitleaks.toml",
+        ".gitignore",
+        "LICENSE",
+        "CHANGELOG.md",
+        "SECURITY.md",
         "Makefile",
         ".pre-commit-config.yaml",
     ):

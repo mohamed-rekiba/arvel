@@ -25,6 +25,10 @@ don't need. An un-pruned copy always boots and passes its own CI.
 | Security (`.github/workflows/security.yml`) | bandit · pip-audit · gitleaks, plus a weekly CVE sweep |
 | `.gitleaks.toml` | secret-scan rules (default set + a docs allowlist); used by CI and the pre-commit hook |
 | `.github/dependabot.yml` | keeps deps + actions current, with a 7-day cooldown |
+| `LICENSE` | MIT by default — edit the copyright line, or swap the license (+ `license` in pyproject) |
+| `CHANGELOG.md` | note changes per release (the tag-based release cuts from your tags) |
+| `SECURITY.md` | how to report a vulnerability |
+| `.gitignore` | keeps the venv, build artifacts, caches, and secrets out of git |
 | `Makefile` + `.pre-commit-config.yaml` | `make check` / `make hooks` — the same gates locally |
 
 | Delete freely | When |

@@ -4,7 +4,20 @@ version = "0.1.0"
 description = "An arvel ecosystem package."
 readme = "README.md"
 requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+keywords = ["arvel", "{{name}}"]
+classifiers = [
+  "Programming Language :: Python :: 3.14",
+  "Framework :: AsyncIO",
+  "Typing :: Typed",
+]
 dependencies = ["arvel"]
+
+[project.urls]
+# Fill these in for the PyPI sidebar, then uncomment:
+# Homepage = "https://github.com/you/arvel-{{name}}"
+# Issues = "https://github.com/you/arvel-{{name}}/issues"
 
 # Each heavy driver engine gets an extra — apps install only what they use, and
 # MissingExtraError points at the fix: uv add 'arvel-{{name}}[<extra>]'.
