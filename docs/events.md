@@ -85,6 +85,11 @@ No `Event.listen(...)` call, no provider edit — the same zero-wiring ergonomic
 scan looks for classes each module *defines* (not ones it imports) that have a callable `handle`;
 string/closure listeners and explicit `Event.listen(...)` calls keep working alongside it.
 
+A discovered listener binds to the **class** in its `handle` hint, so dispatch the event as a class
+— `await Event.dispatch(UserRegistered(...))`, **not** a string channel like `"user.registered"` — or
+it silently won't fire. (Converting string-dispatched listeners to discovered classes? Switch the
+dispatch side to the class too.)
+
 Turn it off, or point it elsewhere, in config (defaults shown):
 
 ```python

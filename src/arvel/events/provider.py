@@ -1,10 +1,9 @@
 """EventServiceProvider — binds the dispatcher (auto-discovered via entry point) and, at boot,
-auto-discovers class listeners in ``app/listeners/`` the way Laravel discovers ``app/Listeners``
-(DR-0046)."""
+auto-discovers class listeners in ``app/listeners/`` by their ``handle`` type hint (DR-0046)."""
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,21 +15,26 @@ if TYPE_CHECKING:
 
 
 def discover_listeners(app: Any, paths: list[str]) -> list[Any]:
-    """Import every ``*.py`` under each ``paths`` dir (relative to ``base_path``) and return the
+    """Load every ``*.py`` under each ``paths`` dir (relative to ``base_path``) and return the
     listener classes they define — those with a callable ``handle``. The dispatcher's ``discover``
-    then binds each to the event in its ``handle(self, event: X)`` type hint. A dir that doesn't
-    exist, or a module that fails to import, is skipped."""
+    then binds each to the event in its ``handle(self, event: X)`` type hint. Files are loaded **by
+    path** (like ``config/*.py`` and migrations), so discovery doesn't depend on ``base_path`` being
+    on ``sys.path``. A dir that doesn't exist is skipped; a module that fails to import
+    (``ImportError``) is skipped — other errors propagate so a genuinely broken listener is loud."""
     found: list[Any] = []
     for rel in paths:
         directory = Path(app.base_path) / rel
         if not directory.is_dir():
             continue
-        module_prefix = rel.replace("/", ".").replace("\\", ".")
         for file in sorted(directory.glob("*.py")):
             if file.stem.startswith("_"):
                 continue
+            spec = importlib.util.spec_from_file_location(f"_arvel_listener_{file.stem}", file)
+            if spec is None or spec.loader is None:  # pragma: no cover - defensive
+                continue
+            module = importlib.util.module_from_spec(spec)
             try:
-                module = importlib.import_module(f"{module_prefix}.{file.stem}")
+                spec.loader.exec_module(module)
             except ImportError:
                 continue
             found.extend(
