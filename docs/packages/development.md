@@ -86,7 +86,7 @@ stripe = "arvel_stripe.provider:StripeServiceProvider"
 ```
 
 Then the provider itself binds the gateway, defaults its config, and contributes a command and a
-publishable config file (see [Service Providers](providers.md) for every verb):
+publishable config file (see [Service Providers](../providers.md) for every verb):
 
 ```python
 from arvel.kernel import ServiceProvider
@@ -130,6 +130,6 @@ default" stays true as the framework grows.
 
 ## See also
 
-- [Service Providers](providers.md) — the provider a package ships, and every integration verb.
-- [Architecture Concepts](architecture.md) — how "light by default" fits the framework's design.
-- [About arvel](about.md) — the engine behind each extra.
+- [Service Providers](../providers.md) — the provider a package ships, and every integration verb.
+- [Architecture Concepts](../architecture.md) — how "light by default" fits the framework's design.
+- [About arvel](../about.md) — the engine behind each extra.

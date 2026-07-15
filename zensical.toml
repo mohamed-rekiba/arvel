@@ -84,16 +84,6 @@ nav = [
     { "Telemetry" = "telemetry.md" },
   ] },
 
-  { "Packages" = [
-    { "Getting Started" = "packages/getting-started.md" },
-    { "Package Development" = "packages/development.md" },
-    { "AI" = [
-      { "Overview & Gateway" = "packages/ai.md" },
-      { "MCP Server" = "packages/ai-mcp.md" },
-      { "Workflows" = "packages/ai-workflows.md" },
-    ] },
-  ] },
-
   { "Security" = [
     { "Authentication" = [
       { "Overview" = "auth/authentication.md" },
@@ -135,6 +125,16 @@ nav = [
     { "Casts & Serialization" = "database/casts.md" },
     { "API Resources" = "database/resources.md" },
     { "Factories" = "database/factories.md" },
+  ] },
+
+  { "Packages" = [
+    { "Getting Started" = "packages/getting-started.md" },
+    { "Package Development" = "packages/development.md" },
+    { "AI" = [
+      { "Overview & Gateway" = "packages/ai.md" },
+      { "MCP Server" = "packages/ai-mcp.md" },
+      { "Workflows" = "packages/ai-workflows.md" },
+    ] },
   ] },
 
   { "Testing" = "testing.md" },
