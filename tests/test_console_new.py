@@ -65,7 +65,7 @@ def test_new_package_scaffolds_full_skeleton(
         "src/arvel_my_pkg/__init__.py",
         "src/arvel_my_pkg/py.typed",
         "src/arvel_my_pkg/provider.py",
-        "src/arvel_my_pkg/config.py",
+        "src/arvel_my_pkg/settings.py",
         "src/arvel_my_pkg/contracts.py",
         "src/arvel_my_pkg/manager.py",
         "src/arvel_my_pkg/drivers.py",
@@ -99,9 +99,7 @@ def test_new_package_scaffolds_full_skeleton(
     assert "delete" in readme.lower()
 
 
-def test_new_package_generated_tests_pass(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_new_package_generated_tests_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The un-pruned skeleton is green out of the box: its own test suite passes
     against the current arvel checkout (anti-rot gate for the template)."""
     import os

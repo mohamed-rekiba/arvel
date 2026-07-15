@@ -1,8 +1,8 @@
 """Driver dispatch for {{name}} — config-selected backend, ecosystem-extensible.
 
-The house Manager pattern: `default_driver()` reads config, `create_<x>_driver`
-methods build backends, `.extend("x", factory)` is the seam for custom drivers,
-and unknown attribute access forwards to the default driver.
+The house Manager pattern: `default_driver()` reads typed settings,
+`create_<x>_driver` methods build backends, `.extend("x", factory)` is the seam
+for custom drivers, and unknown attribute access forwards to the default driver.
 """
 
 from __future__ import annotations
@@ -11,15 +11,19 @@ from typing import Any
 
 from arvel.support.manager import Manager
 
+from .settings import {{cls}}Settings
+
 
 class {{cls}}Manager(Manager):
     # MissingExtraError hints name THIS distribution, not arvel core.
     extra_package = "arvel-{{name}}"
 
+    def settings(self) -> {{cls}}Settings:
+        # base Manager._settings(cls) reads THIS manager's app config section
+        return self._settings({{cls}}Settings)
+
     def default_driver(self) -> str:
-        if self.app is not None:
-            return str(self.app.make("config").get("{{name}}.default", "memory"))
-        return "memory"
+        return self.settings().default
 
     def create_memory_driver(self) -> Any:
         from .drivers import MemoryDriver

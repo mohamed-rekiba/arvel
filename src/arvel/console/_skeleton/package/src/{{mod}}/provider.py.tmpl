@@ -10,14 +10,14 @@ from __future__ import annotations
 from arvel.kernel import ServiceProvider
 
 from .commands import cli
-from .config import DEFAULTS
 from .manager import {{cls}}Manager
 
 
 class {{cls}}ServiceProvider(ServiceProvider):
     def register(self) -> None:
-        # Package config defaults — the host app's own values win on conflict.
-        self.merge_config_from(DEFAULTS, "{{name}}")
+        # Defaults are the typed {{cls}}Settings field defaults (the framework
+        # Settings pattern) — no merge_config_from, no DEFAULTS dict. The host
+        # app's config("{{name}}") section overrides them.
         self.app.singleton("{{name}}", lambda c: {{cls}}Manager(self.app))
 
         # HTTP routes MUST be contributed here (not in boot): route files load
@@ -44,8 +44,12 @@ class {{cls}}ServiceProvider(ServiceProvider):
         # Namespaced translations, looked up as "{{name}}::messages.hello":
         # self.load_translations_from(str(_here / "lang"), "{{name}}")
         #
-        # Files the host app can copy out and own via `arvel vendor:publish`:
-        # self.publishes({str(_here / "config.py"): "config/{{name}}.py"}, tag="config")
+        # Publish a starter config file the host app can copy out + own via
+        # `arvel vendor:publish` (defaults still come from {{cls}}Settings; this
+        # is only for apps that want an editable config/{{name}}.py starting
+        # point). If you prefer to seed defaults into config instead of typed
+        # Settings, `self.merge_config_from(<mapping>, "{{name}}")` also exists.
+        # self.publishes({str(_here / "settings.py"): "config/{{name}}.py"}, tag="config")
 
     # Defer this provider — zero boot cost until the first app.make("{{name}}"):
     # def provides(self) -> list[type | str]:

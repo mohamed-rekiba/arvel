@@ -13,9 +13,10 @@ from {{mod}}.commands import cli
 from {{mod}}.drivers import FakeDriver
 
 
-def test_manager_binds_and_config_merges(app: Application) -> None:
+def test_manager_binds_and_settings_default(app: Application) -> None:
     manager = app.make("{{name}}")
-    assert app.make("config").get("{{name}}.default") == "memory"
+    # typed {{cls}}Settings supplies defaults (no merge_config_from / DEFAULTS)
+    assert manager.settings().default == "memory"
     assert manager.send("ping") == "sent: ping"
 
 

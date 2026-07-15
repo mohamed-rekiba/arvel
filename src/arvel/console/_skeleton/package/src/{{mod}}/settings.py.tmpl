@@ -1,0 +1,25 @@
+"""Typed, validated config — the framework's ``Settings`` pattern.
+
+``{{cls}}Settings()`` reads + validates ``config("{{name}}")`` on instantiation
+(msgspec, coercing, auto-loading), exactly like ``MailSettings`` /
+``FilesystemSettings``. The field defaults ARE the package defaults — no DEFAULTS
+dict, no ``merge_config_from``, no string ``.get()`` access. The host app
+overrides by setting a ``config("{{name}}")`` section; app values win.
+
+Secrets never live here — store the ENV VAR NAME and read it at use.
+"""
+
+from __future__ import annotations
+
+import msgspec
+
+from arvel.kernel.settings import Settings
+
+
+class {{cls}}Settings(Settings):
+    __config_key__ = "{{name}}"
+
+    # which driver app.make("{{name}}") dispatches to by default
+    default: str = "memory"
+    # per-driver settings, keyed by driver name (open dict — driver-specific keys)
+    drivers: dict[str, dict[str, object]] = msgspec.field(default_factory=dict)
