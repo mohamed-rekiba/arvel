@@ -13,7 +13,7 @@ from __future__ import annotations
 import builtins
 import os
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, overload
 
 _MISSING: Any = object()
 _T = TypeVar("_T")
@@ -119,12 +119,28 @@ class Repository:
         return f"Repository(keys={sorted(self._data)})"
 
 
+@overload
+def config() -> Repository: ...
+@overload
+def config(key: Mapping[str, Any]) -> None: ...
+@overload
+def config[T](key: str, default: T) -> T: ...
+@overload
+def config(key: str) -> Any: ...
 def config(
     key: str | Mapping[str, Any] | None = None,
     default: Any = None,
 ) -> Any:
     """Configuration access: ``config()`` → the repository; ``config('app.name')`` → a value;
-    ``config({'app.name': 'x'})`` → set each dotted key."""
+    ``config({'app.name': 'x'})`` → set each dotted key.
+
+    **Typing:** a typed default flows through — ``config('app.port', 25)`` is statically
+    ``int``, ``config('app.name', 'x')`` is ``str`` (generic over the default's type); with no
+    default the result is ``Any``. This is a *static* convenience, not a runtime check — for a
+    **validated** read (exact-type-or-error) use the repository's typed getters
+    (``config().integer('app.port')`` / ``.string`` / ``.boolean`` / ``.array``) or a typed
+    ``Settings`` class, which coerce + validate the value.
+    """
     from arvel.kernel.globals import app
 
     repo = app().make("config")
