@@ -6,8 +6,12 @@ house driver pattern — swap providers in config, never in code — plus a
 [secured MCP server](ai-mcp.md) that makes your app callable by AI agents.
 
 ```bash
-uv add 'arvel-ai[litellm]'
+uv add 'arvel-ai[anthropic]'   # one extra = the any-llm driver + that provider's SDK
 ```
+
+One extra per provider — `anthropic`, `openai`, `gemini`, `bedrock`, `mistral`,
+`ollama`, `groq`, and the rest of the any-llm matrix (full list in the arvel-ai
+Getting Started guide); `arvel-ai[all]` installs every provider.
 
 Installing registers the provider automatically; `app.make("ai")` and the `AI`
 facade work with zero wiring.
@@ -88,13 +92,13 @@ for call in response.tool_calls:
 ```python
 # config/ai.py (host app)
 ai = {
-    "default": "litellm",
+    "default": "any_llm",
     "models": {"fast": "claude-haiku-4-5", "smart": "claude-opus-4-8"},
 }
 ```
 
-- **litellm** (default) — the LiteLLM SDK: 100+ providers, keys via each
-  provider's own env var.
+- **any_llm** (default) — the any-llm SDK: many providers, `provider:model` ids
+  (`anthropic:claude-haiku-4-5`), keys via each provider's own env var.
 - **openai_compatible** — any OpenAI-format endpoint: a deployed LiteLLM proxy,
   vLLM, Ollama. Needs `base_url`; key via the env var named in `api_key_env`.
 - **fake** — the test double (below).
@@ -140,10 +144,11 @@ Event.listen(AiResponseReceived, audit_ai_usage)
 
 ## Common mistakes & gotchas
 
-- **Extras:** the default `litellm` driver needs `uv add 'arvel-ai[litellm]'`;
-  the `openai_compatible` driver ships in the base install (its httpx engine is
+- **Extras:** the default `any_llm` driver needs a provider extra
+  (`uv add 'arvel-ai[anthropic]'` — one extra per provider); the
+  `openai_compatible` driver ships in the base install (its httpx engine is
   part of arvel core, so there's no extra to add). A missing engine tells you
-  exactly that.
+  exactly which extra to install.
 - **Keys live in env vars** — the config holds env var *names*, never values.
 - **`temperature` is passthrough, not stable API** — some providers reject
   sampling parameters entirely; anything in `options` is between you and the
