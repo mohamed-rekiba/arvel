@@ -21,5 +21,8 @@ class {{cls}}Settings(Settings):
 
     # which driver app.make("{{name}}") dispatches to by default
     default: str = "memory"
-    # per-driver settings, keyed by driver name (open dict — driver-specific keys)
-    drivers: dict[str, dict[str, object]] = msgspec.field(default_factory=dict)
+    # per-driver settings, keyed by driver name (open dict — driver-specific keys).
+    # The factory is subscripted so the element types stay known to the type checkers.
+    drivers: dict[str, dict[str, object]] = msgspec.field(
+        default_factory=dict[str, dict[str, object]]
+    )

@@ -62,6 +62,14 @@ line-length = 100
 [tool.mypy]
 strict = true
 mypy_path = "src"
+files = ["src"] # so a bare `mypy` (what CI runs) has a target
+
+[tool.pyright]
+include = ["src"]
+typeCheckingMode = "strict"
+pythonVersion = "3.14"
+# Third-party engines ship no stubs; reportUnknown* stays on for your own code.
+reportMissingTypeStubs = false
 
 [tool.importlinter]
 root_package = "{{mod}}"

@@ -7,10 +7,15 @@ don't need (README.md has the keep/delete guide).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from arvel.kernel import ServiceProvider
 
 from .commands import cli
 from .manager import {{cls}}Manager
+
+if TYPE_CHECKING:
+    from arvel.contracts import Container
 
 
 class {{cls}}ServiceProvider(ServiceProvider):
@@ -18,7 +23,12 @@ class {{cls}}ServiceProvider(ServiceProvider):
         # Defaults are the typed {{cls}}Settings field defaults (the framework
         # Settings pattern) — no merge_config_from, no DEFAULTS dict. The host
         # app's config("{{name}}") section overrides them.
-        self.app.singleton("{{name}}", lambda c: {{cls}}Manager(self.app))
+        # A named function, not a lambda: the container passes itself in, and the
+        # type checkers want that parameter typed.
+        def make_manager(container: Container) -> {{cls}}Manager:
+            return {{cls}}Manager(self.app)
+
+        self.app.singleton("{{name}}", make_manager)
 
         # HTTP routes MUST be contributed here (not in boot): route files load
         # right after provider registration, while the async boot loop runs
