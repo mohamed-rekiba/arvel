@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.66.1](https://github.com/mohamed-rekiba/arvel/compare/v0.66.0...v0.66.1) (2026-07-17)
+
+
+### Documentation
+
+* arvel-ai driver is now any-llm with per-provider extras ([5f3456e](https://github.com/mohamed-rekiba/arvel/commit/5f3456e2659e44a48134926a56db683b88588e28))
+
 ## [0.66.0](https://github.com/mohamed-rekiba/arvel/compare/v0.65.0...v0.66.0) (2026-07-17)
 
 
