@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.66.0](https://github.com/mohamed-rekiba/arvel/compare/v0.65.0...v0.66.0) (2026-07-17)
+
+
+### Features
+
+* auto-discover listeners from app/listeners/ at boot ([8b7b495](https://github.com/mohamed-rekiba/arvel/commit/8b7b495e337e125d8926d90da8a8f0ad330e0fdb))
+
 ## [0.65.0](https://github.com/mohamed-rekiba/arvel/compare/v0.64.0...v0.65.0) (2026-07-15)
 
 
