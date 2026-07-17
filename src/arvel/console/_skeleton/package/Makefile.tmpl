@@ -20,8 +20,9 @@ format:  ## Ruff format (writes)
 format-check:  ## Ruff format (check only)
 	$(RUN) ruff format --check .
 
-typecheck:  ## Strict mypy
-	$(RUN) mypy src
+typecheck:  ## Strict mypy + pyright — both, exactly as CI runs them
+	$(RUN) mypy
+	$(RUN) pyright
 
 imports:  ## import-linter — keeps heavy engines off the import path
 	PYTHONPATH=src $(RUN) lint-imports
