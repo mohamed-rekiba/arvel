@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "python",
+  "include-component-in-tag": false,
+  "pull-request-title-pattern": "chore: release ${version}",
+  "pull-request-header": ":robot: Release PR opened by release-please",
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactors" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "ci", "section": "CI", "hidden": true },
+    { "type": "chore", "section": "Chores", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "arvel-{{name}}",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        { "type": "generic", "path": "src/{{mod}}/__init__.py" }
+      ]
+    }
+  }
+}

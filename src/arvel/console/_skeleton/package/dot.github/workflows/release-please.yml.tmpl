@@ -1,0 +1,77 @@
+name: Release Please
+
+# Opens/updates a release PR on every push to `main` (Conventional Commits drive
+# the version bump + CHANGELOG). When the release PR merges, release-please tags
+# `v<version>` and creates a GitHub Release; `publish.yml` then builds + uploads
+# to PyPI via Trusted Publishing.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Open / update release PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          # A PAT or GitHub App token lets the tag release-please creates trigger
+          # publish.yml — tags pushed with the default GITHUB_TOKEN do NOT emit
+          # events (GitHub blocks recursive runs), so auto-publish stays dormant
+          # until RELEASE_PLEASE_TOKEN is set.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json
+
+  update-lockfile:
+    name: Regenerate uv.lock on the release PR
+    needs: release-please
+    # A version bump in pyproject.toml invalidates uv.lock (it pins arvel-{{name}}'s own
+    # version). Every CI job runs --frozen, so without this the release PR's CI
+    # would fail. Regenerate the lockfile on the open release-please branch.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          python-version: "3.14"
+      - name: Regenerate uv.lock on each open release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branches=$(gh pr list --state open --json headRefName \
+            --jq '.[] | select(.headRefName | startswith("release-please--branches--main")) | .headRefName')
+          if [ -z "${branches}" ]; then
+            echo "No open release-please PRs; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for branch in ${branches}; do
+            echo "::group::${branch}"
+            git fetch origin "${branch}"
+            git checkout "${branch}"
+            uv lock
+            if git diff --quiet uv.lock; then
+              echo "uv.lock already up to date on ${branch}"
+            else
+              git add uv.lock
+              git commit --amend --no-edit
+              git push --force-with-lease origin "HEAD:${branch}"
+            fi
+            git checkout -
+            echo "::endgroup::"
+          done

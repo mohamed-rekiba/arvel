@@ -1,6 +1,8 @@
 [project]
 name = "arvel-{{name}}"
-version = "0.1.0"
+dynamic = [
+  "version",
+] # single-sourced from {{mod}}.__version__ (release-please managed)
 description = "An arvel ecosystem package."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -32,11 +34,24 @@ dependencies = ["arvel"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "src/{{mod}}/__init__.py" # reads __version__ — one source of truth
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/{{mod}}"]
 
 [dependency-groups]
-dev = ["pytest", "ruff", "mypy", "import-linter", "pre-commit"]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+  "ruff",
+  "mypy",
+  "pyright",
+  "import-linter",
+  "bandit",
+  "pip-audit",
+  "pre-commit",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

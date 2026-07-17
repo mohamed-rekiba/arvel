@@ -87,8 +87,11 @@ def test_new_package_scaffolds_full_skeleton(
         "tests/conftest.py",
         "tests/test_provider.py",
         ".github/workflows/ci.yml",
-        ".github/workflows/release.yml",
+        ".github/workflows/release-please.yml",
+        ".github/workflows/publish.yml",
         ".github/workflows/security.yml",
+        ".github/release-please-config.json",
+        ".github/release-please-manifest.json",
         ".github/dependabot.yml",
         ".github/PULL_REQUEST_TEMPLATE.md",
         ".gitleaks.toml",
@@ -104,6 +107,13 @@ def test_new_package_scaffolds_full_skeleton(
     assert 'name = "arvel-my-pkg"' in pyproject
     assert '"arvel.providers"' in pyproject
     assert "[tool.importlinter]" in pyproject
+    # The version has exactly one source: __version__, which release-please bumps and hatch reads.
+    # A second, static `version = "..."` here would silently freeze the published version at 0.1.0
+    # while the source moved on.
+    assert "[tool.hatch.version]" in pyproject
+    assert 'path = "src/arvel_my_pkg/__init__.py"' in pyproject
+    assert "\nversion = " not in pyproject, "a static version would drift from __version__"
+    assert '__version__ = "0.1.0"' in (root / "src" / "arvel_my_pkg" / "__init__.py").read_text()
     # provider documents every integration verb (commented = inert but discoverable)
     provider = (root / "src" / "arvel_my_pkg" / "provider.py").read_text()
     for verb in (
