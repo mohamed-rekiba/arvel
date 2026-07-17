@@ -133,8 +133,8 @@ nav = [
     { "AI" = [
       { "Overview & Gateway" = "packages/ai.md" },
       { "MCP Server" = "packages/ai-mcp.md" },
-      { "Workflows" = "packages/ai-workflows.md" },
     ] },
+    { "Workflow" = "packages/workflow.md" },
   ] },
 
   { "Testing" = "testing.md" },
