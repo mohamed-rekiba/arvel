@@ -75,6 +75,32 @@ async def test_where_json_like_searches_a_locale_value() -> None:
         await db.dispose()
 
 
+async def test_where_json_like_can_ignore_case() -> None:
+    """A search box typing "phone" must find "Aurora Phone". sqlite's LIKE is already
+    case-insensitive for ASCII, so the load-bearing assertion is the compiled Postgres SQL:
+    case_insensitive=True must emit ILIKE (a plain LIKE silently misses there)."""
+    stmt = (
+        Builder(docs)
+        .where_json_like("data", "name_i18n", "%phone%", case_insensitive=True)
+        .to_select()
+    )
+    assert "ILIKE" in str(stmt.compile(dialect=postgresql.dialect()))
+
+    db = await _seed()
+    try:
+        await Builder(docs, db).insert(
+            {"name": "c", "data": {"lang": "en", "name_i18n": "Aurora Phone"}}
+        )
+        loose = (
+            await Builder(docs, db)
+            .where_json_like("data", "name_i18n", "%phone%", case_insensitive=True)
+            .get()
+        )
+        assert {r["name"] for r in loose} == {"c"}
+    finally:
+        await db.dispose()
+
+
 async def test_where_in_accepts_a_subquery() -> None:
     """where_in with a Select filters DB-side (WHERE id IN (SELECT ...)) — no app-side id list."""
     db = await _seed()

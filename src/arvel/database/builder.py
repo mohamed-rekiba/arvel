@@ -419,12 +419,23 @@ class Builder[M = dict[str, Any]]:
         return self
 
     def where_json_like(
-        self, column: str, path: str, value: str, *, connector: str = "and"
+        self,
+        column: str,
+        path: str,
+        value: str,
+        *,
+        case_insensitive: bool = False,
+        connector: str = "and",
     ) -> Self:
         """``LIKE`` against a value inside a JSON column — ``where('data->name', 'like', '%x%')``.
         Handy for searching a per-locale translatable attribute, e.g.
-        ``where_json_like('name', 'en', '%phone%')``. Cross-dialect (json_extract / ``->>``)."""
-        self._add(self._json_path(column, path).as_string().like(value), connector)
+        ``where_json_like('name', 'en', '%phone%')``. Cross-dialect (json_extract / ``->>``).
+
+        ``case_insensitive=True`` emits ``ILIKE`` semantics — what a human-facing search box
+        almost always wants (a plain LIKE silently misses "Verge" for "verge" on Postgres)."""
+        extracted = self._json_path(column, path).as_string()
+        clause = extracted.ilike(value) if case_insensitive else extracted.like(value)
+        self._add(clause, connector)
         return self
 
     def where_json_contains(self, column: str, value: Any, *, connector: str = "and") -> Self:
