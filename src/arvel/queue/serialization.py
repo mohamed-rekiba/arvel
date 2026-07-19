@@ -83,7 +83,21 @@ def queue_callback(fn: Any) -> Any:
 
         @queue_callback
         def on_chain_failure(exc): ...
+
+    Module-level only, and enforced rather than documented. A method's qualified name resolves
+    *unbound*, so a batch callback would be called as ``fn(batch, exc)`` with ``batch`` silently
+    binding to ``self`` — clean-looking, wrong, and it fires precisely when something has already
+    failed. Two closures from different calls share one qualified name, so the later registration
+    silently wins. Neither is exploitable (only registered callables run), but both are the kind of
+    bug you debug at 3am.
     """
+    qualname = getattr(fn, "__qualname__", "")
+    if "." in qualname:
+        raise ValueError(
+            f"@queue_callback requires a module-level function, got {qualname!r} — a method "
+            "resolves unbound (its first argument would bind to self) and closures sharing a "
+            "qualified name overwrite each other in the registry"
+        )
     _CALLBACK_REGISTRY[_qualified_name(fn)] = fn
     return fn
 

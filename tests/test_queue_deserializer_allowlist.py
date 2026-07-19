@@ -16,8 +16,21 @@ from typing import Any
 
 import pytest
 
-from arvel.queue import Job, deserialize, deserialize_any, deserialize_instance, serialize
+from arvel.queue import (
+    Job,
+    deserialize,
+    deserialize_any,
+    deserialize_instance,
+    queue_callback,
+    serialize,
+)
 from arvel.queue.serialization import _JOB_REGISTRY, _qualified_name, serialize_instance
+
+
+@queue_callback
+def _on_failure(exc: BaseException) -> str:
+    """Module-level by necessity — `@queue_callback` rejects methods and closures."""
+    return "handled"
 
 
 class RegisteredJob(Job):
@@ -251,14 +264,38 @@ async def test_chain_catch_ref_cannot_name_an_arbitrary_callable() -> None:
 
 
 async def test_registered_callback_still_resolves() -> None:
-    from arvel.queue import queue_callback
     from arvel.queue.serialization import _qualified_name, resolve_callback
 
-    @queue_callback
-    def on_failure(exc: BaseException) -> str:
-        return "handled"
+    assert resolve_callback(_qualified_name(_on_failure)) is _on_failure
 
-    assert resolve_callback(_qualified_name(on_failure)) is on_failure
+
+async def test_queue_callback_rejects_a_method() -> None:
+    """A method resolves *unbound*, so a batch callback would bind `batch` to `self`.
+
+    It runs clean and does the wrong thing — at the moment a job has already failed. Enforced at
+    decoration time rather than left to the docstring.
+    """
+    from arvel.queue import queue_callback
+
+    with pytest.raises(ValueError, match="module-level function"):
+
+        class Handler:
+            @queue_callback
+            def on_failure(self, exc: BaseException) -> None: ...
+
+
+async def test_queue_callback_rejects_a_closure() -> None:
+    """Two closures from different calls share one qualified name — the later one silently wins."""
+    from arvel.queue import queue_callback
+
+    def outer() -> Any:
+        @queue_callback
+        def inner(exc: BaseException) -> None: ...
+
+        return inner
+
+    with pytest.raises(ValueError, match="module-level function"):
+        outer()
 
 
 async def test_queued_notification_middleware_path_is_guarded() -> None:
