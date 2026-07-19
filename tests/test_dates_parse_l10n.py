@@ -82,3 +82,27 @@ def test_diff_for_humans_falls_back_to_current_locale() -> None:
         assert BASE.add(hours=3).diff_for_humans(BASE) == "dans 3 heures"
     finally:
         current_locale.set("en")
+
+
+def test_parse_instant_and_offset_iso() -> None:
+    """Plain ISO-8601 instants — the format every JS client emits via toISOString() — parse:
+    Z-suffixed, with milliseconds, and with a UTC offset. The result lands in tz (or the
+    app timezone), preserving the absolute moment."""
+    assert (
+        Date.parse("2026-07-19T00:30:00Z", tz="UTC").to_iso()
+        == "2026-07-19T00:30:00+00:00[UTC]"
+    )
+    assert (
+        Date.parse("2026-07-19T00:30:00.250Z", tz="UTC").to_iso()
+        == "2026-07-19T00:30:00.25+00:00[UTC]"
+    )
+    # +02:00 offset: same instant, expressed in UTC
+    assert (
+        Date.parse("2026-07-19T02:30:00+02:00", tz="UTC").to_iso()
+        == "2026-07-19T00:30:00+00:00[UTC]"
+    )
+    # a T-separated naive datetime behaves like the space-separated one
+    assert (
+        Date.parse("2026-07-19T00:30:00", tz="UTC").to_iso()
+        == "2026-07-19T00:30:00+00:00[UTC]"
+    )

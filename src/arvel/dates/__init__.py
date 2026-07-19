@@ -20,6 +20,7 @@ from whenever import (
     TUESDAY,
     WEDNESDAY,
     Instant,
+    OffsetDateTime,
     ZonedDateTime,
 )
 
@@ -79,7 +80,13 @@ class Date:
 
     # date-only / space-separated datetime, tried (in order) once the full ISO parse below
     # fails; explicit seconds are optional (parsing conveniences matching the reference).
-    _NAIVE_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d")
+    _NAIVE_FORMATS = (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M:%S",  # T-separated naive — HTML datetime-local et al.
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d",
+    )
 
     def __init__(self, dt: ZonedDateTime) -> None:
         self._dt = dt
@@ -118,13 +125,19 @@ class Date:
         try:
             dt = ZonedDateTime.parse_iso(text)
         except ValueError:
-            for fmt in cls._NAIVE_FORMATS:
-                try:
-                    naive = _datetime.datetime.strptime(text, fmt)
-                except ValueError:
-                    continue
-                return cls(cls._zoned_from_stdlib(naive, zone))
-            raise DateParseError(text) from None
+            # plain ISO instants (2026-07-19T00:30:00Z / …+02:00) — what every JS client's
+            # toISOString() emits — carry an absolute moment but no zone bracket; land them in tz
+            try:
+                instant = OffsetDateTime.parse_iso(text).to_instant()
+            except ValueError:
+                for fmt in cls._NAIVE_FORMATS:
+                    try:
+                        naive = _datetime.datetime.strptime(text, fmt)
+                    except ValueError:
+                        continue
+                    return cls(cls._zoned_from_stdlib(naive, zone))
+                raise DateParseError(text) from None
+            return cls(instant.to_tz(zone))
         return cls(dt if tz is None else dt.to_tz(tz))
 
     @staticmethod
