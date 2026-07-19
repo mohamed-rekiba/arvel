@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/mohamed-rekiba/arvel/compare/v0.66.1...v1.0.0) (2026-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **#301:** only `Job` subclasses (and classes passed to `register_job`) deserialize from a queue payload. Duck-typed job classes are refused, and payloads already sitting in a broker for such a class will fail on resume. This matches the contract docs/queues.md already states.
+
+### Features
+
+* **database:** where_json_like grows case_insensitive=True (ILIKE) ([596d548](https://github.com/mohamed-rekiba/arvel/commit/596d5486d0726feaeddea267c591f00df74c25c7))
+
+
+### Bug Fixes
+
+* **#301:** resolve queue job classes from a registry instead of importing the payload's name ([#302](https://github.com/mohamed-rekiba/arvel/issues/302)) ([729e5d5](https://github.com/mohamed-rekiba/arvel/commit/729e5d59da8c080536b7fd90aec660bf46cc0d6d)), closes [#301](https://github.com/mohamed-rekiba/arvel/issues/301)
+* **dates:** Date.parse accepts plain ISO instants and T-separated naives ([fc4f4fb](https://github.com/mohamed-rekiba/arvel/commit/fc4f4fb96fd5f7c3a9c4565e87e4837c5001f82d))
+
 ## [0.66.1](https://github.com/mohamed-rekiba/arvel/compare/v0.66.0...v0.66.1) (2026-07-17)
 
 
