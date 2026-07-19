@@ -73,15 +73,14 @@ check: _gates  ## Fast pre-push gate, no Docker — NOT all of CI (see check-all
 	@echo "  'make check-all' adds the integration tier, the E2E smoke, the docs build,"
 	@echo "  the SBOM and the distribution check. Run it before trusting a green local pass."
 
-check-all: _gates test-integration e2e docs sbom dist-check  ## Every PR-blocking CI job with a local equivalent (needs Docker)
+check-all: _gates test-integration e2e docs sbom dist-check  ## Every PR-blocking CI job with an authoritative local equivalent (needs Docker)
 	@echo ""
-	@echo "  Full local gate passed. Two CI jobs this does NOT settle:"
+	@echo "  Full local gate passed. Two PR-blocking jobs this does NOT settle:"
 	@echo "    gitleaks — no local equivalent; a GitHub Action needing GITHUB_TOKEN"
-	@echo "    semgrep  — runs locally, but not authoritatively: CI pins 1.163.0"
-	@echo "               (uvx gives a newer engine) and --config=auto is an unpinned"
-	@echo "               ruleset, so a local pass can still fail in CI"
-	@echo ""
-	@echo "  Note: dist-check mirrors publish.yml, which runs on tag push, not on PRs."
+	@echo "    semgrep  — runs locally, but not authoritatively: CI pins 1.163.0 and"
+	@echo "               --config=auto is an unpinned ruleset, so local and CI can"
+	@echo "               disagree in either direction (local runs a newer engine,"
+	@echo "               which generally finds more, not less)"
 
 stubs:  ## Regenerate facade type stubs (.pyi) from the live backing classes
 	$(RUN) python tools/gen_facade_stubs.py
