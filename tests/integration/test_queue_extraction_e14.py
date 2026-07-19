@@ -36,6 +36,7 @@ from arvel.queue import (  # pyright: ignore[reportPrivateUsage]
     Job,
     QueuedJob,
     QueueManager,
+    queue_callback,
 )
 from arvel.queue.batch import JobBatch
 from arvel.queue.middleware import ShouldBeUnique
@@ -229,10 +230,12 @@ _COMBO_THEN: list[bool] = []
 _COMBO_CATCH: list[bool] = []
 
 
+@queue_callback
 def _combo_then(batch: object) -> None:
     _COMBO_THEN.append(True)
 
 
+@queue_callback
 def _combo_catch(batch: object, exc: BaseException) -> None:
     _COMBO_CATCH.append(True)
 

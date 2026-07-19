@@ -23,7 +23,7 @@ import sqlalchemy as sa
 
 from arvel.database import ConnectionResolver
 from arvel.kernel import Application, set_application
-from arvel.queue import Bus, Job, QueuedJob, QueueManager
+from arvel.queue import Bus, Job, QueuedJob, QueueManager, queue_callback
 
 pytestmark = pytest.mark.integration
 
@@ -265,6 +265,7 @@ class BatchStep(Job):
 _BATCH_THEN_FIRED: dict[str, bool] = {}
 
 
+@queue_callback
 def _mark_batch_then(batch: Any) -> None:
     _BATCH_THEN_FIRED[batch.id] = True
 
