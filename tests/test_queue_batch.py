@@ -12,7 +12,7 @@ from taskiq import InMemoryBroker
 
 from arvel.database import ConnectionResolver
 from arvel.kernel import Application, set_application
-from arvel.queue import Bus, Job, QueueManager
+from arvel.queue import Bus, Job, QueueManager, queue_callback
 from arvel.queue.batch import Batch, JobBatch, apply_job_outcome
 
 ORDER: list[str] = []
@@ -39,14 +39,17 @@ class Boom(Job):
         """Silence: this test asserts on catch/counts, not FailedJob persistence noise."""
 
 
+@queue_callback
 def _record_then(batch: Any) -> None:
     THEN_CALLS.append(batch.id)
 
 
+@queue_callback
 def _record_catch(batch: Any, exc: BaseException) -> None:
     CATCH_CALLS.append((batch.id, type(exc)))
 
 
+@queue_callback
 def _record_finally(batch: Any) -> None:
     FINALLY_CALLS.append(batch.id)
 

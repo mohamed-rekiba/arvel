@@ -40,6 +40,10 @@ from arvel.queue.serialization import deserialize_any as deserialize_any
 from arvel.queue.serialization import deserialize_instance as deserialize_instance
 from arvel.queue.serialization import encode_instance as encode_instance
 from arvel.queue.serialization import model_ref as model_ref
+from arvel.queue.serialization import queue_callback as queue_callback
+from arvel.queue.serialization import register_job as register_job
+from arvel.queue.serialization import register_serializable as register_serializable
+from arvel.queue.serialization import resolve_callback as resolve_callback
 from arvel.queue.serialization import serialize as serialize
 from arvel.queue.serialization import serialize_instance as serialize_instance
 from arvel.queue.worker import JobWorker
@@ -124,6 +128,13 @@ class Job:
     __arvel_log_context__: dict[str, Any] | None = (
         None  # dispatcher's bound log context, propagated
     )
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Register every job class as it's defined. `deserialize` resolves the payload's `job`
+        # field against this registry instead of importing the name it carries, so a tampered
+        # broker message can't name an arbitrary import target (GH-301).
+        super().__init_subclass__(**kwargs)
+        register_job(cls)
 
     async def handle(self) -> Any:
         raise NotImplementedError(f"{type(self).__name__} must implement handle()")
@@ -741,6 +752,9 @@ __all__ = [
     "deserialize_any",
     "deserialize_instance",
     "encode_instance",
+    "queue_callback",
+    "register_job",
+    "register_serializable",
     "run_job_with_retries",
     "serialize",
     "serialize_instance",

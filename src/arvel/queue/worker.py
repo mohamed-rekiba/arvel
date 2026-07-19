@@ -417,9 +417,11 @@ class JobWorker:
             return
         import inspect
 
-        from arvel.queue.serialization import _load  # pyright: ignore[reportPrivateUsage]
+        from arvel.queue.serialization import resolve_callback
 
-        outcome = _load(catch_ref)(exc)
+        # `catch_ref` rides in the job's own state, which `deserialize_instance` sets unfiltered —
+        # so a tampered payload could name any importable target here and have it called (GH-301).
+        outcome = resolve_callback(catch_ref)(exc)
         if inspect.isawaitable(outcome):
             await outcome
 

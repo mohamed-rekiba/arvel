@@ -7,12 +7,18 @@ from typing import Any
 from typer.testing import CliRunner
 
 from arvel.console import build_cli
+from arvel.queue import Job
 
 runner = CliRunner()
 
 
-class _RetryMe:
-    """A trivially serializable job for the queue:retry round-trip."""
+class _RetryMe(Job):
+    """A trivially serializable job for the queue:retry round-trip.
+
+    Subclasses `Job` so it lands in the deserializer's registry — `deserialize_instance`
+    resolves job classes by lookup rather than by importing the payload's name (GH-301),
+    and this class travels through a stored `failed_jobs` payload on the retry path.
+    """
 
     queue = "default"
 

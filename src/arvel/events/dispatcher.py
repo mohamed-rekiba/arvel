@@ -23,8 +23,40 @@ if TYPE_CHECKING:
     from arvel.contracts import Container
 
 
+#: Queued-listener classes, keyed by ``module:qualname``. `CallQueuedListener` carries a listener
+#: *reference* in its payload state, and that state is attacker-settable on a tampered message —
+#: so the worker resolves the reference against this registry instead of importing the name it was
+#: handed (GH-301). Lives here rather than under `arvel.queue` because `events` sits below `queue`
+#: in the module DAG and must not import upward; `queue` reads it.
+_QUEUED_LISTENERS: dict[str, type] = {}
+
+
+def register_queued_listener(cls: type) -> None:
+    """Record ``cls`` as a listener the worker may instantiate from a queue payload."""
+    _QUEUED_LISTENERS[f"{cls.__module__}:{cls.__qualname__}"] = cls
+
+
 class ShouldQueue:
     """Marker base: a listener that should run on the queue, not inline."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Only ShouldQueue listeners are ever queued (see `_queue_if_needed`), so subclassing is
+        # the exact moment a listener becomes payload-reachable — and the same moment it becomes
+        # registrable. A listener must be imported to be registered with the dispatcher at all,
+        # so anything legitimately reaching the worker has already run this hook.
+        super().__init_subclass__(**kwargs)
+        register_queued_listener(cls)
+
+
+#: Broadcastable event classes, keyed by ``module:qualname``. `CallQueuedBroadcast` carries an
+#: event *reference* in its payload state, which is attacker-settable on a tampered message — so
+#: the worker resolves it against this registry rather than importing the name (GH-301).
+_BROADCAST_EVENTS: dict[str, type] = {}
+
+
+def register_broadcast_event(cls: type) -> None:
+    """Record ``cls`` as an event the worker may rebuild from a queue payload."""
+    _BROADCAST_EVENTS[f"{cls.__module__}:{cls.__qualname__}"] = cls
 
 
 class ShouldBroadcast:
@@ -32,6 +64,13 @@ class ShouldBroadcast:
     internal job carries the broadcast to the worker; see ``Dispatcher._broadcast``), composed
     with after-commit like a queued listener's own dispatch. Subclass :class:`ShouldBroadcastNow`
     instead for the old inline-send behavior."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Subclassing is the moment an event becomes broadcastable — and so payload-reachable
+        # through `CallQueuedBroadcast.event_ref`. Register it here so the worker never has to
+        # import a name the payload chose.
+        super().__init_subclass__(**kwargs)
+        register_broadcast_event(cls)
 
 
 class ShouldBroadcastNow(ShouldBroadcast):
