@@ -75,9 +75,11 @@ check: _gates  ## Fast pre-push gate, no Docker — NOT all of CI (see check-all
 
 check-all: _gates test-integration e2e docs sbom dist-check  ## Every PR-blocking CI job with a local equivalent (needs Docker)
 	@echo ""
-	@echo "  Full local gate passed. Two CI jobs have no local equivalent:"
-	@echo "    gitleaks — a GitHub Action; needs GITHUB_TOKEN"
-	@echo "    semgrep  — --config=auto needs the rule registry and network"
+	@echo "  Full local gate passed. Two CI jobs this does NOT settle:"
+	@echo "    gitleaks — no local equivalent; a GitHub Action needing GITHUB_TOKEN"
+	@echo "    semgrep  — runs locally, but not authoritatively: CI pins 1.163.0"
+	@echo "               (uvx gives a newer engine) and --config=auto is an unpinned"
+	@echo "               ruleset, so a local pass can still fail in CI"
 	@echo ""
 	@echo "  Note: dist-check mirrors publish.yml, which runs on tag push, not on PRs."
 
