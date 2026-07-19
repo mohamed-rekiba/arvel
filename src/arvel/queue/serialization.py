@@ -27,6 +27,38 @@ def _load(qualified: str) -> Any:
     return getattr(importlib.import_module(module_name), qualname)
 
 
+#: Job classes loadable from a broker payload, keyed by ``module:qualname``. Populated by
+#: ``Job.__init_subclass__`` at class-definition time — see :func:`register_job`.
+_JOB_REGISTRY: dict[str, type] = {}
+
+
+def register_job(cls: type) -> None:
+    """Record ``cls`` as a job class that :func:`deserialize` may instantiate."""
+    _JOB_REGISTRY[_qualified_name(cls)] = cls
+
+
+def _load_job(qualified: str) -> Any:
+    """Resolve a job class from the registry — a **lookup, never an import**.
+
+    `deserialize` calls the class it resolves with payload-supplied args, so resolving via
+    `importlib.import_module` would let anyone with broker write access import and call an
+    arbitrary target (`{"job": "os:system", "args": [...]}`) — RCE on every worker. The
+    membership test has to *replace* the import rather than follow it: importing an
+    attacker-named module runs its module-level side effects before any `issubclass` check
+    could fire.
+
+    A job is registered when its class body executes, so worker processes must import their
+    job modules before consuming (arvel's boot does; a lazily-loading deployment must too).
+    """
+    try:
+        return _JOB_REGISTRY[qualified]
+    except KeyError:
+        raise ValueError(
+            f"refusing to load unregistered job class {qualified!r} from a queue payload — "
+            "the job's module must be imported by the worker before it can run"
+        ) from None
+
+
 def model_ref(value: Any) -> Any:
     """Make a value JSON-safe for the broker, **recursively**: a Model → a ``(class, pk)`` ref,
     ``bytes`` → a tagged base64 string (msgspec encodes bytes to base64 but can't decode them back to
@@ -145,7 +177,7 @@ async def deserialize(payload: str) -> Job:
     import msgspec
 
     data = msgspec.json.decode(payload)
-    job_cls = _load(str(data["job"]))
+    job_cls = _load_job(str(data["job"]))
     args = [await _rehydrate(a) for a in data["args"]]
     kwargs = {k: await _rehydrate(v) for k, v in data["kwargs"].items()}
     job: Job = job_cls(*args, **kwargs)
@@ -178,7 +210,7 @@ async def deserialize_instance(payload: str) -> Job:
     import msgspec
 
     data = msgspec.json.decode(payload)
-    job_cls = _load(str(data["job"]))
+    job_cls = _load_job(str(data["job"]))
     job: Job = job_cls.__new__(job_cls)  # bypass __init__; restore attribute state directly
     for key, val in cast("dict[str, Any]", data["state"]).items():
         setattr(job, key, await _rehydrate(val))
@@ -224,6 +256,7 @@ __all__ = [
     "deserialize_instance",
     "encode_instance",
     "model_ref",
+    "register_job",
     "serialize",
     "serialize_instance",
 ]
