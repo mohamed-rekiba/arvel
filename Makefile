@@ -1,10 +1,16 @@
-# arvel — developer tasks. The gate targets mirror `make check` + CI.
+# arvel — developer tasks.
+#
+# Two gate targets, and the difference matters:
+#   make check      fast, no Docker — the pre-push gate. NOT everything CI runs.
+#   make check-all  every CI gate that can run locally, including the Docker-backed tiers.
+#
 # Prefer `uv run` so it works without an activated venv; falls back to PATH tools.
 RUN ?= uv run
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install lock lint format typecheck imports security test test-parallel coverage audit check \
+.PHONY: help install lock lint format format-check typecheck imports security test test-parallel \
+        coverage audit check check-all e2e dist-check \
         hooks docs docs-serve pre-commit clean stubs build test-integration
 
 help:  ## Show this help
@@ -45,6 +51,9 @@ test-parallel:  ## pytest across CPU cores (pytest-xdist); same unit suite, proc
 test-integration:  ## integration tier — real services via testcontainers (needs Docker)
 	$(RUN) pytest -m integration
 
+e2e:  ## consumer-path smoke — scaffold an app, boot it, serve a route, run the CLI
+	$(RUN) bash tools/e2e_smoke.sh
+
 coverage:  ## pytest under coverage; enforce line coverage >= 95%
 	$(RUN) bash tools/coverage_gate.sh
 
@@ -54,13 +63,25 @@ audit:  ## pip-audit (blocking; one documented carve-out — see DR-0008 / SECUR
 	# new high/critical CVE blocks. Drop the ignore when asyncmy ships a fix.
 	$(RUN) pip-audit --ignore-vuln GHSA-qhqw-rrw9-25rm
 
-check: lint format-check typecheck imports security audit coverage  ## All gates + coverage (what CI runs)
+check: lint format-check typecheck imports security audit coverage  ## Fast pre-push gate, no Docker — NOT all of CI (see check-all)
+	@echo ""
+	@echo "  Fast gate passed — but this is NOT everything CI runs."
+	@echo "  'make check-all' adds the integration tier, the E2E smoke, the docs build"
+	@echo "  and the distribution check. Run it before you rely on a green local pass."
+
+check-all: check test-integration e2e docs dist-check  ## Every CI gate runnable locally (needs Docker)
+	@echo ""
+	@echo "  Full local gate passed."
+	@echo "  Still CI-only (containerised actions, no local equivalent): semgrep, gitleaks, SBOM."
 
 stubs:  ## Regenerate facade type stubs (.pyi) from the live backing classes
 	$(RUN) python tools/gen_facade_stubs.py
 
 build:  ## Build sdist + wheel into dist/
 	uv build
+
+dist-check: build  ## Validate the built distribution's metadata (CI's twine check)
+	uvx twine check dist/*
 
 hooks:  ## Install pre-commit git hooks
 	$(RUN) pre-commit install
