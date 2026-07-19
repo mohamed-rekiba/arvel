@@ -31,6 +31,25 @@ def _load(qualified: str) -> Any:
 #: ``Job.__init_subclass__`` at class-definition time — see :func:`register_job`.
 _JOB_REGISTRY: dict[str, type] = {}
 
+#: The framework's own queued jobs, as *names* rather than classes.
+#:
+#: Each lives in a module kept lazy on purpose (G2 — `arvel.mail`, `arvel.notifications` and the
+#: queue's own listener/broadcast modules must not be pulled in by `import arvel`), so none of them
+#: has executed its class body when a worker boots and `_JOB_REGISTRY` is empty. Eagerly importing
+#: them to register would defeat the startup contract; hardcoding the *names* keeps the allowlist
+#: closed while deferring the import to the moment a payload legitimately asks for one.
+#:
+#: Membership here is what makes the subsequent `_load` safe: the name is fixed at source, never
+#: taken from the payload.
+_FRAMEWORK_JOBS = frozenset(
+    {
+        "arvel.mail:SendQueuedMailable",
+        "arvel.notifications:SendQueuedNotification",
+        "arvel.queue.listener:CallQueuedListener",
+        "arvel.queue.broadcast:CallQueuedBroadcast",
+    }
+)
+
 
 def register_job(cls: type) -> None:
     """Record ``cls`` as a job class that :func:`deserialize` may instantiate."""
@@ -47,16 +66,22 @@ def _load_job(qualified: str) -> Any:
     attacker-named module runs its module-level side effects before any `issubclass` check
     could fire.
 
-    A job is registered when its class body executes, so worker processes must import their
-    job modules before consuming (arvel's boot does; a lazily-loading deployment must too).
+    Resolution order: an app job that has executed its class body is already in the registry;
+    otherwise the name must be one of the framework's own lazily-imported jobs, whose names are
+    fixed in `_FRAMEWORK_JOBS` at source. Anything else is refused.
     """
-    try:
-        return _JOB_REGISTRY[qualified]
-    except KeyError:
-        raise ValueError(
-            f"refusing to load unregistered job class {qualified!r} from a queue payload — "
-            "the job's module must be imported by the worker before it can run"
-        ) from None
+    registered = _JOB_REGISTRY.get(qualified)
+    if registered is not None:
+        return registered
+    if qualified in _FRAMEWORK_JOBS:
+        # The name came from a source-level frozenset, not the payload, so importing it here
+        # can't be steered by an attacker.
+        return _load(qualified)
+    raise ValueError(
+        f"refusing to load unregistered job class {qualified!r} from a queue payload — "
+        "a job must subclass arvel.queue.Job (or be passed to register_job) in a module the "
+        "worker has imported"
+    )
 
 
 def model_ref(value: Any) -> Any:

@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from arvel.events.dispatcher import ShouldQueue
 from arvel.kernel import has_application, set_application
 from arvel.kernel.application import Application
 from arvel.queue.listener import CallQueuedListener
@@ -18,19 +19,19 @@ from arvel.queue.listener import CallQueuedListener
 _seen: list[Any] = []
 
 
-class SyncListener:
+class SyncListener(ShouldQueue):
     def handle(self, value: Any) -> str:
         _seen.append(("sync", value))
         return f"handled:{value}"
 
 
-class AsyncListener:
+class AsyncListener(ShouldQueue):
     async def handle(self, value: Any) -> str:
         _seen.append(("async", value))
         return f"async:{value}"
 
 
-class StatefulListener:
+class StatefulListener(ShouldQueue):
     def __init__(self, suffix: str) -> None:
         self.suffix = suffix
 
@@ -79,7 +80,7 @@ async def test_instance_listener_is_encoded_and_decoded() -> None:
 # --- 5.4: failed() delegates to the wrapped listener, exactly once, on exhaustion ------------
 
 
-class FailingListener:
+class FailingListener(ShouldQueue):
     tries = 1
     failed_calls: list[BaseException] = []
 
@@ -90,7 +91,7 @@ class FailingListener:
         FailingListener.failed_calls.append(exc)
 
 
-class FailingListenerBadHook:
+class FailingListenerBadHook(ShouldQueue):
     def handle(self, value: str) -> None:
         raise RuntimeError("boom")
 
@@ -98,7 +99,7 @@ class FailingListenerBadHook:
         raise RuntimeError("the failure hook itself is broken")
 
 
-class ListenerWithoutFailedHook:
+class ListenerWithoutFailedHook(ShouldQueue):
     def handle(self, value: str) -> None:
         raise RuntimeError("boom")
 

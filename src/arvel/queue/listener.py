@@ -13,11 +13,10 @@ from typing import Any
 
 from arvel.queue import (
     Job,
-    _load,  # pyright: ignore[reportPrivateUsage]
     _qualified_name,  # pyright: ignore[reportPrivateUsage]
-    decode_instance,
     encode_instance,
 )
+from arvel.queue.serialization import _rehydrate  # pyright: ignore[reportPrivateUsage]
 
 
 class CallQueuedListener(Job):
@@ -55,15 +54,38 @@ class CallQueuedListener(Job):
             args=args,
         )
 
+    def _registered_listener(self) -> Any:
+        """Resolve `listener_ref` against the queued-listener registry — a lookup, never an import.
+
+        This job's own class passes the deserializer's allowlist legitimately, but its state is
+        attacker-settable on a tampered payload, and `listener_ref` used to be handed straight to
+        `_load`. That reopened the exact hole the allowlist closed: import an arbitrary name, then
+        call `handle(*args)` on it with attacker-controlled arguments (GH-301).
+
+        Only `ShouldQueue` subclasses are ever queued, and a listener must be imported before it
+        can be registered with the dispatcher, so any reference that legitimately reaches a worker
+        is already in the registry.
+        """
+        from arvel.events.dispatcher import _QUEUED_LISTENERS  # pyright: ignore[reportPrivateUsage]
+
+        listener_cls = _QUEUED_LISTENERS.get(self.listener_ref)
+        if listener_cls is None:
+            raise ValueError(
+                f"refusing to load unregistered listener {self.listener_ref!r} from a queue "
+                "payload — a queued listener must subclass arvel.events.ShouldQueue"
+            )
+        return listener_cls
+
     async def _resolve_listener(self) -> Any:
+        listener_cls = self._registered_listener()
         if self.is_class:
             from arvel.kernel import app, has_application
 
-            listener_cls = _load(self.listener_ref)
             return app().make(listener_cls) if has_application() else listener_cls()
-        return await decode_instance(
-            {"__class__": self.listener_ref, "__state__": self.listener_state}
-        )
+        instance = listener_cls.__new__(listener_cls)
+        for key, value in (self.listener_state or {}).items():
+            setattr(instance, key, await _rehydrate(value))
+        return instance
 
     async def handle(self) -> Any:
         instance = await self._resolve_listener()

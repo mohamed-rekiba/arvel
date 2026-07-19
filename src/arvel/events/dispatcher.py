@@ -23,8 +23,29 @@ if TYPE_CHECKING:
     from arvel.contracts import Container
 
 
+#: Queued-listener classes, keyed by ``module:qualname``. `CallQueuedListener` carries a listener
+#: *reference* in its payload state, and that state is attacker-settable on a tampered message —
+#: so the worker resolves the reference against this registry instead of importing the name it was
+#: handed (GH-301). Lives here rather than under `arvel.queue` because `events` sits below `queue`
+#: in the module DAG and must not import upward; `queue` reads it.
+_QUEUED_LISTENERS: dict[str, type] = {}
+
+
+def register_queued_listener(cls: type) -> None:
+    """Record ``cls`` as a listener the worker may instantiate from a queue payload."""
+    _QUEUED_LISTENERS[f"{cls.__module__}:{cls.__qualname__}"] = cls
+
+
 class ShouldQueue:
     """Marker base: a listener that should run on the queue, not inline."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Only ShouldQueue listeners are ever queued (see `_queue_if_needed`), so subclassing is
+        # the exact moment a listener becomes payload-reachable — and the same moment it becomes
+        # registrable. A listener must be imported to be registered with the dispatcher at all,
+        # so anything legitimately reaching the worker has already run this hook.
+        super().__init_subclass__(**kwargs)
+        register_queued_listener(cls)
 
 
 class ShouldBroadcast:
