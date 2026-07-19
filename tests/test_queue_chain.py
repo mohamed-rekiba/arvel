@@ -9,7 +9,7 @@ from typing import Any
 from taskiq import InMemoryBroker
 
 from arvel.kernel import Application, set_application
-from arvel.queue import Bus, Job, QueueManager
+from arvel.queue import Bus, Job, QueueManager, queue_callback
 
 ORDER: list[str] = []
 CAUGHT: list[BaseException] = []
@@ -37,6 +37,7 @@ class Boom(Job):
         """Silence: this test asserts on `catch`/ORDER, not on FailedJob persistence noise."""
 
 
+@queue_callback
 def _record_catch(exc: BaseException) -> None:
     CAUGHT.append(exc)
 

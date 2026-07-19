@@ -40,7 +40,10 @@ from arvel.queue.serialization import deserialize_any as deserialize_any
 from arvel.queue.serialization import deserialize_instance as deserialize_instance
 from arvel.queue.serialization import encode_instance as encode_instance
 from arvel.queue.serialization import model_ref as model_ref
+from arvel.queue.serialization import queue_callback as queue_callback
 from arvel.queue.serialization import register_job as register_job
+from arvel.queue.serialization import register_serializable as register_serializable
+from arvel.queue.serialization import resolve_callback as resolve_callback
 from arvel.queue.serialization import serialize as serialize
 from arvel.queue.serialization import serialize_instance as serialize_instance
 from arvel.queue.worker import JobWorker
@@ -749,7 +752,9 @@ __all__ = [
     "deserialize_any",
     "deserialize_instance",
     "encode_instance",
+    "queue_callback",
     "register_job",
+    "register_serializable",
     "run_job_with_retries",
     "serialize",
     "serialize_instance",

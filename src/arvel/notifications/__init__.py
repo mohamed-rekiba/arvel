@@ -205,9 +205,14 @@ class SendQueuedNotification(Job):
         which runs after rehydration). The notification's own ``middleware()`` then builds e.g.
         ``RateLimited`` fresh (resolving its limiter from the container), so nothing live has to
         have survived serialization."""
-        from arvel.queue import _load  # pyright: ignore[reportPrivateUsage]
+        from arvel.queue.serialization import (
+            _load_serializable,  # pyright: ignore[reportPrivateUsage]
+        )
 
-        cls = _load(str(self.notification["__class__"]))
+        # This deliberately bypasses `decode_instance` (it must stay synchronous), so it needs the
+        # registry lookup applied here too — otherwise the class ref, which rides in payload state,
+        # reaches an import on a path the chokepoint never sees (GH-301).
+        cls = _load_serializable(str(self.notification["__class__"]))
         notification = cls.__new__(cls)
         notification.__dict__.update(cast("dict[str, Any]", self.notification["__state__"]))
         # self.notifiable is the job's OWN top-level attribute — already rehydrated to a live

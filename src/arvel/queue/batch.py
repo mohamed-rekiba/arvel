@@ -168,10 +168,13 @@ async def _finish_batch_once(batch_id: str) -> bool:
 async def _run_callbacks(refs: list[str], *args: Any) -> None:
     import inspect
 
-    from arvel.queue import _load  # pyright: ignore[reportPrivateUsage]
+    from arvel.queue.serialization import resolve_callback
 
+    # Batch callbacks come off the JobBatch row rather than the broker, so the trust boundary is
+    # the database — a narrower one than the payload path. Resolved by lookup regardless: a
+    # callable named by stored data and invoked with arguments is the same shape either way.
     for ref in refs:
-        outcome = _load(ref)(*args)
+        outcome = resolve_callback(ref)(*args)
         if inspect.isawaitable(outcome):
             await outcome
 

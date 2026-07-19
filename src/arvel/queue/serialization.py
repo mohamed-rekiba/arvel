@@ -68,6 +68,61 @@ def register_serializable(cls: type) -> None:
     _SERIALIZABLE_REGISTRY[_qualified_name(cls)] = cls
 
 
+#: Module-level callables reachable from a payload — chain `catch()` handlers and batch
+#: then/catch/finally callbacks. These are *functions*, not classes, so they can't ride the
+#: class registries; they opt in explicitly via :func:`queue_callback`.
+_CALLBACK_REGISTRY: dict[str, Any] = {}
+
+
+def queue_callback(fn: Any) -> Any:
+    """Mark a module-level function as invocable from a queue payload.
+
+    Chain `catch()` handlers and batch callbacks travel as qualified names and are *called* on the
+    worker, so resolving them by import is the same defect as the job allowlist closed. Decorate
+    the function to opt it in::
+
+        @queue_callback
+        def on_chain_failure(exc): ...
+    """
+    _CALLBACK_REGISTRY[_qualified_name(fn)] = fn
+    return fn
+
+
+def resolve_callback(ref: str) -> Any:
+    """Resolve a payload-named callable from the registry — a lookup, never an import."""
+    found = _CALLBACK_REGISTRY.get(ref)
+    if found is None:
+        raise ValueError(
+            f"refusing to call unregistered callback {ref!r} from a queue payload — decorate it "
+            "with @arvel.queue.queue_callback"
+        )
+    return found
+
+
+def _load_model(qualified: str) -> Any:
+    """Resolve a model-ref's class from the ORM's own registry — a lookup, never an import.
+
+    `model_ref` reduces a Model to `(class, pk)` on dispatch and `_rehydrate` re-fetches it on the
+    worker, so the class name is payload-supplied like every other reference here. `ModelMeta`
+    already records every concrete model for polymorphic `morph_to` resolution, so this reuses that
+    registry rather than adding a parallel one.
+    """
+    from arvel.database.model import resolve_model
+
+    # The ORM keys its registry `module.Name`; payload refs are the queue's `module:QualName`.
+    # `__name__` is the last segment of `__qualname__`, so this reconstructs the ORM's form.
+    module_name, _, qualname = qualified.partition(":")
+    found = resolve_model(f"{module_name}.{qualname.rsplit('.', 1)[-1]}") or resolve_model(
+        qualified
+    )
+    if found is None:
+        raise ValueError(
+            f"refusing to load unregistered model {qualified!r} from a queue payload — the model's "
+            "module must be imported by the worker before a job referencing it can run"
+        )
+    return found
+
+
 def _load_serializable(qualified: str) -> Any:
     """Resolve a nested serializable by lookup — the shared chokepoint, never an import.
 
@@ -161,7 +216,7 @@ def _is_model_ref(value: Any) -> bool:
 async def _rehydrate(value: Any) -> Any:
     if _is_model_ref(value):
         ref = cast("dict[str, Any]", value)
-        model_cls = _load(str(ref["__model__"]))
+        model_cls = _load_model(str(ref["__model__"]))
         return await model_cls.find(ref["__id__"])
     if isinstance(value, dict) and "__bytes__" in value:
         import base64
@@ -322,7 +377,10 @@ __all__ = [
     "deserialize_instance",
     "encode_instance",
     "model_ref",
+    "queue_callback",
     "register_job",
+    "register_serializable",
+    "resolve_callback",
     "serialize",
     "serialize_instance",
 ]

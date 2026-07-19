@@ -234,6 +234,48 @@ async def test_decode_instance_still_rebuilds_a_registered_mailable() -> None:
     assert rebuilt.name == "ada"
 
 
+async def test_model_ref_cannot_name_an_arbitrary_class() -> None:
+    """`__model__` refs are payload data too — `_rehydrate` imported them and called `.find()`."""
+    from arvel.queue.serialization import _rehydrate  # pyright: ignore[reportPrivateUsage]
+
+    with pytest.raises(ValueError, match="unregistered model"):
+        await _rehydrate({"__model__": "os:system", "__id__": 1})
+
+
+async def test_chain_catch_ref_cannot_name_an_arbitrary_callable() -> None:
+    """`__arvel_chain_catch__` rides in job state and is *called* — the arbitrary-args shape."""
+    from arvel.queue.serialization import resolve_callback
+
+    with pytest.raises(ValueError, match="unregistered callback"):
+        resolve_callback("os:system")
+
+
+async def test_registered_callback_still_resolves() -> None:
+    from arvel.queue import queue_callback
+    from arvel.queue.serialization import _qualified_name, resolve_callback
+
+    @queue_callback
+    def on_failure(exc: BaseException) -> str:
+        return "handled"
+
+    assert resolve_callback(_qualified_name(on_failure)) is on_failure
+
+
+async def test_queued_notification_middleware_path_is_guarded() -> None:
+    """`SendQueuedNotification.middleware()` resolves its class ref outside `decode_instance`.
+
+    It has to stay synchronous, so it can't route through the async chokepoint — which means the
+    guard has to be applied at that call site too, or the payload-supplied class ref reaches an
+    import on a path the chokepoint never sees.
+    """
+    from arvel.notifications import SendQueuedNotification
+
+    job = SendQueuedNotification.__new__(SendQueuedNotification)
+    job.notification = {"__class__": "os:system", "__state__": {}}
+    with pytest.raises(ValueError, match="unregistered class"):
+        job.middleware()
+
+
 async def test_decode_instance_still_rebuilds_a_registered_broadcast_event() -> None:
     from arvel.events.dispatcher import ShouldBroadcast
     from arvel.queue import decode_instance, encode_instance
