@@ -68,6 +68,14 @@ class AppriseMessage:
 class Notification:
     """Base notification: override ``via`` + the per-channel ``to_*`` builders."""
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Same rail as a queued mailable: the class ref travels in the payload and is
+        # attacker-settable, so the worker resolves it by lookup rather than import (GH-301).
+        from arvel.queue.serialization import register_serializable
+
+        super().__init_subclass__(**kwargs)
+        register_serializable(cls)
+
     def via(self, notifiable: Any) -> list[str]:
         return ["mail"]
 

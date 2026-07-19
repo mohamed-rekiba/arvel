@@ -56,6 +56,47 @@ def register_job(cls: type) -> None:
     _JOB_REGISTRY[_qualified_name(cls)] = cls
 
 
+#: Non-job classes that may be rebuilt from a payload's ``{class, state}`` view — mailables,
+#: notifications, and anything an adopter passes to :func:`register_serializable`. Broadcast events
+#: and queued listeners keep their own registries under ``arvel.events`` (that module sits below
+#: ``queue`` in the DAG and must not import upward); :func:`_load_serializable` consults all three.
+_SERIALIZABLE_REGISTRY: dict[str, type] = {}
+
+
+def register_serializable(cls: type) -> None:
+    """Record ``cls`` as rebuildable by :func:`decode_instance` from a queue payload."""
+    _SERIALIZABLE_REGISTRY[_qualified_name(cls)] = cls
+
+
+def _load_serializable(qualified: str) -> Any:
+    """Resolve a nested serializable by lookup — the shared chokepoint, never an import.
+
+    Every framework queued job carries a class reference in its payload state
+    (``SendQueuedMailable.mailable``, ``SendQueuedNotification.notification``,
+    ``CallQueuedBroadcast.event_ref``), and `deserialize_instance` setattrs that state without
+    filtering. Handing those references to `importlib` let a tampered message name any module —
+    the same defect the job allowlist closed, one level down (GH-301).
+
+    Registration happens when the class body executes. Mailables, notifications and broadcast
+    events must all be defined before they can be dispatched, and the worker boots the same app,
+    so anything legitimately reaching this point is registered.
+    """
+    from arvel.events.dispatcher import (
+        _BROADCAST_EVENTS,  # pyright: ignore[reportPrivateUsage]
+        _QUEUED_LISTENERS,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    for registry in (_SERIALIZABLE_REGISTRY, _QUEUED_LISTENERS, _BROADCAST_EVENTS):
+        found = registry.get(qualified)
+        if found is not None:
+            return found
+    raise ValueError(
+        f"refusing to rebuild unregistered class {qualified!r} from a queue payload — a class "
+        "carried across the broker must subclass Mailable, Notification, ShouldQueue or "
+        "ShouldBroadcast (or be passed to register_serializable)"
+    )
+
+
 def _load_job(qualified: str) -> Any:
     """Resolve a job class from the registry — a **lookup, never an import**.
 
@@ -267,7 +308,7 @@ def encode_instance(obj: object) -> dict[str, Any]:
 async def decode_instance(data: dict[str, Any]) -> Any:
     """Rebuild an object encoded by :func:`encode_instance` — bypasses ``__init__`` and restores the
     attribute state (model refs re-fetched fresh), mirroring :func:`deserialize_instance`."""
-    cls = _load(str(data["__class__"]))
+    cls = _load_serializable(str(data["__class__"]))
     obj = cls.__new__(cls)
     for key, val in cast("dict[str, Any]", data["__state__"]).items():
         setattr(obj, key, await _rehydrate(val))

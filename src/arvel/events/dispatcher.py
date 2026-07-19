@@ -48,11 +48,29 @@ class ShouldQueue:
         register_queued_listener(cls)
 
 
+#: Broadcastable event classes, keyed by ``module:qualname``. `CallQueuedBroadcast` carries an
+#: event *reference* in its payload state, which is attacker-settable on a tampered message — so
+#: the worker resolves it against this registry rather than importing the name (GH-301).
+_BROADCAST_EVENTS: dict[str, type] = {}
+
+
+def register_broadcast_event(cls: type) -> None:
+    """Record ``cls`` as an event the worker may rebuild from a queue payload."""
+    _BROADCAST_EVENTS[f"{cls.__module__}:{cls.__qualname__}"] = cls
+
+
 class ShouldBroadcast:
     """Marker base: an event that should be broadcast to clients — **queued** by default (a small
     internal job carries the broadcast to the worker; see ``Dispatcher._broadcast``), composed
     with after-commit like a queued listener's own dispatch. Subclass :class:`ShouldBroadcastNow`
     instead for the old inline-send behavior."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Subclassing is the moment an event becomes broadcastable — and so payload-reachable
+        # through `CallQueuedBroadcast.event_ref`. Register it here so the worker never has to
+        # import a name the payload chose.
+        super().__init_subclass__(**kwargs)
+        register_broadcast_event(cls)
 
 
 class ShouldBroadcastNow(ShouldBroadcast):

@@ -142,6 +142,15 @@ class _StorageRef:
 class Mailable:
     """Base mail message: subclass and override ``build()``."""
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # A queued mailable crosses the broker as a class ref plus state, and that ref is
+        # attacker-settable on a tampered payload — so the worker resolves it from this registry
+        # instead of importing the name it was handed (GH-301).
+        from arvel.queue.serialization import register_serializable
+
+        super().__init_subclass__(**kwargs)
+        register_serializable(cls)
+
     # Class-level defaults so base fields exist even if a subclass skips super().__init__() or is
     # rebuilt via __new__ (a queued mailable decoded by the worker; see SendQueuedMailable).
     _subject: str = ""

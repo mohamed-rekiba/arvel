@@ -187,3 +187,61 @@ async def test_registry_is_keyed_by_qualified_name_not_bare_class_name() -> None
     key = _qualified_name(Shadow)
     assert ":" in key
     assert _JOB_REGISTRY[key] is Shadow
+
+
+# --- decode_instance: the shared chokepoint for state-carried class refs -------------------
+#
+# Every framework queued job carries a class reference in its payload state, and
+# `deserialize_instance` setattrs that state unfiltered. `CallQueuedListener` was the first found;
+# the other three route through `decode_instance`. These pin the chokepoint rather than each sink.
+
+
+async def test_queued_mailable_ref_cannot_name_an_arbitrary_class() -> None:
+    from arvel.mail import SendQueuedMailable
+
+    job = SendQueuedMailable.__new__(SendQueuedMailable)
+    job.mailable = {"__class__": "os:system", "__state__": {}}
+    with pytest.raises(ValueError, match="unregistered class"):
+        await job._rebuild_mailable()  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_broadcast_event_ref_cannot_name_an_arbitrary_class() -> None:
+    from arvel.queue.broadcast import CallQueuedBroadcast
+
+    job = CallQueuedBroadcast("os:system", {})
+    with pytest.raises(ValueError, match="unregistered class"):
+        await job.handle()
+
+
+async def test_decode_instance_refuses_an_unregistered_class() -> None:
+    from arvel.queue import decode_instance
+
+    with pytest.raises(ValueError, match="unregistered class"):
+        await decode_instance({"__class__": "subprocess:Popen", "__state__": {}})
+
+
+async def test_decode_instance_still_rebuilds_a_registered_mailable() -> None:
+    """The guard must not break the legitimate queued-mailable rail."""
+    from arvel.mail import Mailable
+    from arvel.queue import decode_instance, encode_instance
+
+    class WelcomeMail(Mailable):
+        def __init__(self, name: str = "") -> None:
+            self.name = name
+
+    rebuilt = await decode_instance(encode_instance(WelcomeMail("ada")))
+    assert isinstance(rebuilt, WelcomeMail)
+    assert rebuilt.name == "ada"
+
+
+async def test_decode_instance_still_rebuilds_a_registered_broadcast_event() -> None:
+    from arvel.events.dispatcher import ShouldBroadcast
+    from arvel.queue import decode_instance, encode_instance
+
+    class OrderShipped(ShouldBroadcast):
+        def __init__(self, order_id: str = "") -> None:
+            self.order_id = order_id
+
+    rebuilt = await decode_instance(encode_instance(OrderShipped("A1")))
+    assert isinstance(rebuilt, OrderShipped)
+    assert rebuilt.order_id == "A1"
