@@ -9,6 +9,7 @@ anything unregistered is refused *without* its module being imported.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from typing import Any
 
@@ -62,12 +63,19 @@ async def test_refusal_happens_without_importing_the_named_module() -> None:
     Importing an attacker-named module runs its module-level side effects before any
     post-hoc `issubclass` check could fire — so a guard that imports first and validates
     after is not a guard at all.
+
+    The probe module must be genuinely **importable** but not yet imported: naming a
+    module that doesn't exist would make the `sys.modules` assertion pass against an
+    import-first implementation too, which would pin nothing.
     """
-    victim = "arvel_gh301_probe"
+    victim = "xml.dom.pulldom"  # real, stdlib, and nothing in arvel imports it
+    assert importlib.util.find_spec(victim) is not None, (
+        "probe must be importable, or this test passes vacuously"
+    )
     sys.modules.pop(victim, None)
 
     with pytest.raises(ValueError, match="unregistered job class"):
-        await deserialize(f'{{"job": "{victim}:Anything", "args": [], "kwargs": {{}}}}')
+        await deserialize(f'{{"job": "{victim}:parse", "args": [], "kwargs": {{}}}}')
 
     assert victim not in sys.modules, "the deserializer imported a payload-supplied module"
 
