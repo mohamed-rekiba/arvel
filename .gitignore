@@ -29,3 +29,7 @@ htmlcov/
 .repowise/
 .vscode/mcp.json
 .mcp.json
+
+# SBOM + its intermediate export (make sbom / the SBOM CI job)
+sbom-*.cdx.json
+req-*.txt
